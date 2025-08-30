@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"regexp"
 	"sync"
 )
 
@@ -41,6 +42,10 @@ func (xpc *XPClient) assertValues() {
 	if xpc.Transport == nil {
 		xpc.Transport = http.DefaultTransport
 	}
+
+	// trim any trailing / off the URL
+	trailingSlashes := regexp.MustCompile("/+$")
+	xpc.URL = trailingSlashes.ReplaceAllString(xpc.URL, "")
 }
 
 func (xpc *XPClient) RestRequest(
