@@ -72,8 +72,8 @@ func (v *DatarefValue) GetFloatValue() float64 {
 // GetIntValue returns an int dataref value.
 func (v *DatarefValue) GetIntValue() int {
 	if v != nil {
-		if x, ok := v.Value.(int); ok {
-			return x
+		if x, ok := v.Value.(float64); ok {
+			return int(x)
 		}
 	}
 	return 0
