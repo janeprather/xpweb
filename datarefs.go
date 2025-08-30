@@ -30,6 +30,10 @@ type datarefValueResponse struct {
 	Data any `json:"data"`
 }
 
+type datarefValuePatch struct {
+	Data any `json:"data"`
+}
+
 // ValueType is a string representing a dataref value type which may be provided by the simulator.
 type ValueType string
 
@@ -205,4 +209,33 @@ func (xpc *XPClient) GetDatarefValue(ctx context.Context, name string) (*Dataref
 		ValueType: dataref.ValueType,
 		Value:     datarefValueResp.Data,
 	}, nil
+}
+
+// SetDatarefValue applies the specified value to the specified dataref.
+func (xpc *XPClient) SetDatarefValue(ctx context.Context, name string, value any) error {
+	dataref, err := xpc.GetDatarefByName(ctx, name)
+	if err != nil {
+		return fmt.Errorf("getDatarefID(): %w", err)
+	}
+
+	path := fmt.Sprintf("/api/v2/datarefs/%d/value", dataref.ID)
+	payload := &datarefValuePatch{}
+
+	// data types must be base64 encoded
+	switch realValue := value.(type) {
+	case string:
+		payload.Data = base64.StdEncoding.EncodeToString([]byte(realValue))
+	case []byte:
+		payload.Data = base64.StdEncoding.EncodeToString(realValue)
+	default:
+		// numbers and arrays of numbers are sent verbatim
+		payload.Data = realValue
+	}
+
+	err = xpc.RestRequest(ctx, http.MethodPatch, path, payload, nil)
+	if err != nil {
+		return fmt.Errorf("REST request failed: %w", err)
+	}
+
+	return nil
 }

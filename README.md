@@ -12,11 +12,11 @@ Available features:
   * get capabilities
   * get datarefs & dataref count
   * get dataref values
+  * set dataref values
 
 Forthcoming features:
 
 * REST
-  * set dataref values
   * get commands & command count
   * activate commands
 * WebSockets

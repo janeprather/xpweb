@@ -45,4 +45,28 @@ func main() {
 	} else {
 		fmt.Printf("unexpected type for acf name: %s\n", acfNameVal.ValueType)
 	}
+
+	if err := halveFuel(ctx, client); err != nil {
+		panic(fmt.Sprintf("halveFuel(): %s\n", err.Error()))
+	}
+}
+
+func halveFuel(ctx context.Context, client *webxp.XPClient) error {
+	fuelVal, err := client.GetDatarefValue(ctx, "sim/flightmodel/weight/m_fuel")
+	if err != nil {
+		return fmt.Errorf("GetDatarefValue(): %w", err)
+	}
+
+	fuel := fuelVal.GetFloatArrayValue()
+
+	for idx, tankFuel := range fuel {
+		fuel[idx] = tankFuel / 2
+	}
+
+	err = client.SetDatarefValue(ctx, "sim/flightmodel/weight/m_fuel", fuel)
+	if err != nil {
+		return fmt.Errorf("SetDatarefValue(): %w", err)
+	}
+
+	return nil
 }
