@@ -101,15 +101,17 @@ func (xpc *XPClient) RestRequest(
 		return fmt.Errorf("non-200 response from API: %s - %s", resp.Status, errorMessage)
 	}
 
-	bodyData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("unable to read response body: %w", err)
-	}
+	if target != nil {
+		bodyData, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("unable to read response body: %w", err)
+		}
 
-	err = json.Unmarshal(bodyData, &target)
-	if err != nil {
-		return fmt.Errorf("unable to unmarshal response into %s: %w",
-			reflect.TypeOf(target).String(), err)
+		err = json.Unmarshal(bodyData, &target)
+		if err != nil {
+			return fmt.Errorf("unable to unmarshal response into %s: %w",
+				reflect.TypeOf(target).String(), err)
+		}
 	}
 
 	return nil
