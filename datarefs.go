@@ -141,7 +141,7 @@ func (xpc *XPClient) GetDatarefs(ctx context.Context) ([]*Dataref, error) {
 	datarefsResp := &datarefsResponse{}
 	err := xpc.RestRequest(ctx, http.MethodGet, "/api/v2/datarefs", nil, datarefsResp)
 	if err != nil {
-		return nil, fmt.Errorf("REST request failed: %w", err)
+		return nil, err
 	}
 	return datarefsResp.Data, nil
 }
@@ -151,7 +151,7 @@ func (xpc *XPClient) GetDatarefsCount(ctx context.Context) (int, error) {
 	datarefsCountResp := &datarefsCountResponse{}
 	err := xpc.RestRequest(ctx, http.MethodGet, "/api/v2/datarefs/count", nil, datarefsCountResp)
 	if err != nil {
-		return 0, fmt.Errorf("REST request failed: %w", err)
+		return 0, err
 	}
 	return datarefsCountResp.Data, nil
 }
@@ -202,7 +202,7 @@ func (xpc *XPClient) GetDatarefValue(ctx context.Context, name string) (*Dataref
 	datarefValueResp := &datarefValueResponse{}
 	err = xpc.RestRequest(ctx, http.MethodGet, path, nil, datarefValueResp)
 	if err != nil {
-		return nil, fmt.Errorf("REST request failed: %w", err)
+		return nil, err
 	}
 
 	return &DatarefValue{
@@ -223,7 +223,7 @@ func (xpc *XPClient) SetDatarefValue(ctx context.Context, name string, value any
 
 	err = xpc.RestRequest(ctx, http.MethodPatch, path, payload, nil)
 	if err != nil {
-		return fmt.Errorf("REST request failed: %w", err)
+		return err
 	}
 
 	return nil
@@ -247,7 +247,7 @@ func (xpc *XPClient) SetDatarefElementValue(
 
 	err = xpc.RestRequest(ctx, http.MethodPatch, path, payload, nil)
 	if err != nil {
-		return fmt.Errorf("REST request failed: %w", err)
+		return err
 	}
 
 	return nil

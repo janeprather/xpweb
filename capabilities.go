@@ -2,7 +2,6 @@ package xpweb
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 )
 
@@ -19,7 +18,7 @@ func (xpc *XPClient) GetCapabilities(ctx context.Context) (*Capabilities, error)
 	capabilities := &Capabilities{}
 	err := xpc.RestRequest(ctx, http.MethodGet, "/api/capabilities", nil, capabilities)
 	if err != nil {
-		return nil, fmt.Errorf("REST request failed: %w", err)
+		return nil, err
 	}
 	return capabilities, nil
 }
