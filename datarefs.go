@@ -219,6 +219,42 @@ func (xpc *XPClient) SetDatarefValue(ctx context.Context, name string, value any
 	}
 
 	path := fmt.Sprintf("/api/v2/datarefs/%d/value", dataref.ID)
+	payload := genSetDatarefValuePayload(value)
+
+	err = xpc.RestRequest(ctx, http.MethodPatch, path, payload, nil)
+	if err != nil {
+		return fmt.Errorf("REST request failed: %w", err)
+	}
+
+	return nil
+}
+
+// SetDatarefElementValue applies the specified value to the specified element index of the
+// specified array type dataref.
+func (xpc *XPClient) SetDatarefElementValue(
+	ctx context.Context,
+	name string,
+	index int,
+	value any,
+) error {
+	dataref, err := xpc.GetDatarefByName(ctx, name)
+	if err != nil {
+		return fmt.Errorf("getDatarefID(): %w", err)
+	}
+
+	path := fmt.Sprintf("/api/v2/datarefs/%d/value?index=%d", dataref.ID, index)
+	payload := genSetDatarefValuePayload(value)
+
+	err = xpc.RestRequest(ctx, http.MethodPatch, path, payload, nil)
+	if err != nil {
+		return fmt.Errorf("REST request failed: %w", err)
+	}
+
+	return nil
+}
+
+// genSetDatarefValuePayload generates a datarefValuePatch object for a given value.
+func genSetDatarefValuePayload(value any) *datarefValuePatch {
 	payload := &datarefValuePatch{}
 
 	// data types must be base64 encoded
@@ -231,11 +267,5 @@ func (xpc *XPClient) SetDatarefValue(ctx context.Context, name string, value any
 		// numbers and arrays of numbers are sent verbatim
 		payload.Data = realValue
 	}
-
-	err = xpc.RestRequest(ctx, http.MethodPatch, path, payload, nil)
-	if err != nil {
-		return fmt.Errorf("REST request failed: %w", err)
-	}
-
-	return nil
+	return payload
 }
