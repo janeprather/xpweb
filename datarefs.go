@@ -45,7 +45,7 @@ const (
 // DatarefValue is a type-agnostic object containing a dataref value.  The ValueType attribute may
 // be checked if necessary, and an appropriate method may be called to return the typed value.
 //   - float - DatarefValue.GetFloatValue
-//   - double - DatarefValue.GetDoubleValue
+//   - double - DatarefValue.GetFloatValue
 //   - int - DatarefValue.GetIntValue
 //   - int_array - DatarefValue.GetIntArrayValue
 //   - float_array - DatarefValue.GetFloatArrayValue
@@ -56,17 +56,7 @@ type DatarefValue struct {
 }
 
 // GetFloatValue returns a float32 dataref value.
-func (v *DatarefValue) GetFloatValue() float32 {
-	if v != nil {
-		if x, ok := v.Value.(float32); ok {
-			return x
-		}
-	}
-	return 0
-}
-
-// GetDoubleValue returns a float64 dataref value.
-func (v *DatarefValue) GetDoubleValue() float64 {
+func (v *DatarefValue) GetFloatValue() float64 {
 	if v != nil {
 		if x, ok := v.Value.(float64); ok {
 			return x
@@ -88,18 +78,36 @@ func (v *DatarefValue) GetIntValue() int {
 // GetIntArrayValue returns an int slice dataref value.
 func (v *DatarefValue) GetIntArrayValue() []int {
 	if v != nil {
-		if x, ok := v.Value.([]int); ok {
-			return x
+		if x, ok := v.Value.([]any); ok {
+			var val []int
+			for _, itemV := range x {
+				if item, ok := itemV.(float64); ok {
+					val = append(val, int(item))
+				} else {
+					// non-numeric value, bogus data
+					return nil
+				}
+			}
+			return val
 		}
 	}
 	return nil
 }
 
-// GetFloatArrayValue returns a float32 slice dataref value.
-func (v *DatarefValue) GetFloatArrayValue() []float32 {
+// GetFloatArrayValue returns a float slice dataref value.
+func (v *DatarefValue) GetFloatArrayValue() []float64 {
 	if v != nil {
-		if x, ok := v.Value.([]float32); ok {
-			return x
+		if x, ok := v.Value.([]any); ok {
+			var val []float64
+			for _, itemV := range x {
+				if item, ok := itemV.(float64); ok {
+					val = append(val, item)
+				} else {
+					// non-numeric value, bogus data
+					return nil
+				}
+			}
+			return val
 		}
 	}
 	return nil
