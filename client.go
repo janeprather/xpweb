@@ -78,6 +78,22 @@
 //	if err != nil {
 //		return err
 //	}
+//
+// Command activation requires specifying a duration for the command.  This can be a zero value for
+// commands which are performed instantly, like turning a switch on, or for a set number of seconds
+// for longer commands like starting an engine.
+//
+//	if err := client.ActivateCommand(ctx, "sim/engines/engage_starters", 2); err != nil {
+//		return err
+//	}
+//
+// Constants of known command names are provided in the github.com/janeprather/xpweb/names/command
+// package, and may help avoid repeating string literals and the risk of typos going undetected
+// during lint/build.
+//
+//	if err := client.ActivateCommand(ctx, command.SimElectricalBattery1On, 0); err != nil {
+//		return err
+//	}
 package xpweb
 
 import (
