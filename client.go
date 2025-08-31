@@ -1,3 +1,5 @@
+//go:generate go run gen_names.go
+
 // Package xpweb provides client functionality for the X-Plane 12 web API.
 //
 // https://developer.x-plane.com/article/x-plane-web-api/
