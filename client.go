@@ -102,10 +102,13 @@ type XPClient struct {
 	// unspecified, the http.DefaultTransport will be used.
 	Transport http.RoundTripper
 
+	commands     CommandsMap
+	commandsLock sync.RWMutex
 	datarefs     DatarefsMap
 	datarefsLock sync.RWMutex
 }
 
+type CommandsMap map[string]*Command
 type DatarefsMap map[string]*Dataref
 
 // ErrorResponse is an error response received from the API.
