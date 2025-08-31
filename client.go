@@ -81,6 +81,12 @@
 //		return err
 //	}
 //
+// Consants of known dataref names are provided in the github.com/janeprather/xpweb/names/dataref
+// package, and may help avoid repeating string literals and the risk of typos going undetected
+// during lint/build.
+//
+//	acfNameVal, err := client.GetDatarefValue(ctx, dataref.SimAircraftView_acf_ui_name)
+//
 // Command activation requires specifying a duration for the command.  This can be a zero value for
 // commands which are performed instantly, like turning a switch on, or for a set number of seconds
 // for longer commands like starting an engine.
@@ -93,9 +99,7 @@
 // package, and may help avoid repeating string literals and the risk of typos going undetected
 // during lint/build.
 //
-//	if err := client.ActivateCommand(ctx, command.SimElectricalBattery1On, 0); err != nil {
-//		return err
-//	}
+//	err := client.ActivateCommand(ctx, command.SimElectrical_battery_1_on, 0)
 package xpweb
 
 import (
