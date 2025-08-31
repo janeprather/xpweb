@@ -20,8 +20,12 @@ type commandPost struct {
 
 // Dataref is a definition of a command provided by the simulator.
 type Command struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
+	// The ID of the command.  This may change between simulator sessions, but will remain static
+	// within any given session, including across aircraft loads and unloads.
+	ID uint `json:"id"`
+	// The fully qualified name of the command, as used by the simulator and plugins.
+	Name string `json:"name"`
+	// The human readable description of what the command does.
 	Description string `json:"description"`
 }
 
