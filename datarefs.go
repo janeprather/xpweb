@@ -179,7 +179,7 @@ func (xpc *XPClient) LoadDatarefs(ctx context.Context) error {
 
 	datarefs, err := xpc.GetDatarefs(ctx)
 	if err != nil {
-		return fmt.Errorf("DetDatarefs(): %w", err)
+		return err
 	}
 
 	xpc.datarefs = make(DatarefsMap)
