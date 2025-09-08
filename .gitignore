@@ -1,2 +1,3 @@
 # test client build
 cmd/test-client/test-client
+vendor/

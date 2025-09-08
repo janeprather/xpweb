@@ -5,17 +5,3 @@
 An X-Plane 12 web API client package.
 
 This is a work in progress.  This repository may be destroyed or have updates force pushed.
-
-Available features:
-
-* REST
-  * get capabilities
-  * get datarefs & dataref count
-  * get and set dataref values
-  * get commands & command count
-  * activate commands
-
-Forthcoming features:
-
-* WebSockets
-  * everything

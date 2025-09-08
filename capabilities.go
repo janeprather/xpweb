@@ -14,9 +14,9 @@ type Capabilities struct {
 	} `json:"x-plane"`
 }
 
-func (xpc *XPClient) GetCapabilities(ctx context.Context) (*Capabilities, error) {
+func (c *RESTClient) GetCapabilities(ctx context.Context) (*Capabilities, error) {
 	capabilities := &Capabilities{}
-	err := xpc.RestRequest(ctx, http.MethodGet, "/api/capabilities", nil, capabilities)
+	err := c.makeRequest(ctx, http.MethodGet, "/api/capabilities", nil, capabilities)
 	if err != nil {
 		return nil, err
 	}

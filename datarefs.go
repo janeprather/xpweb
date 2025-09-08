@@ -15,7 +15,7 @@ type datarefsResponse struct {
 type Dataref struct {
 	// The ID of the dataref.  This may change between simulator sessions, but will remain static
 	// within any given session, including across aircraft loads and unloads.
-	ID uint `json:"id"`
+	ID uint64 `json:"id"`
 	// The fully qualified name of the dataref, as used by the simulator and plugins.
 	Name string `json:"name"`
 	// The type of the dataref value(s).
@@ -55,8 +55,8 @@ const (
 //   - float_array - DatarefValue.GetFloatArrayValue
 //   - data - DatarefValue.GetByteArrayValue or DatarefValue.GetStringValue
 type DatarefValue struct {
-	ValueType ValueType
-	Value     any
+	Dataref *Dataref
+	Value   any
 }
 
 // GetFloatValue returns a float32 dataref value.
@@ -137,9 +137,9 @@ func (v *DatarefValue) GetStringValue() string {
 }
 
 // GetDatarefs fetches and returns a list of available datarefs from the simulator.
-func (xpc *XPClient) GetDatarefs(ctx context.Context) ([]*Dataref, error) {
+func (c *RESTClient) GetDatarefs(ctx context.Context) ([]*Dataref, error) {
 	datarefsResp := &datarefsResponse{}
-	err := xpc.RestRequest(ctx, http.MethodGet, "/api/v2/datarefs", nil, datarefsResp)
+	err := c.makeRequest(ctx, http.MethodGet, "/api/v2/datarefs", nil, datarefsResp)
 	if err != nil {
 		return nil, err
 	}
@@ -147,44 +147,74 @@ func (xpc *XPClient) GetDatarefs(ctx context.Context) ([]*Dataref, error) {
 }
 
 // GetDatarefsCount returns the number of total datarefs available.
-func (xpc *XPClient) GetDatarefsCount(ctx context.Context) (int, error) {
+func (c *RESTClient) GetDatarefsCount(ctx context.Context) (int, error) {
 	datarefsCountResp := &datarefsCountResponse{}
-	err := xpc.RestRequest(ctx, http.MethodGet, "/api/v2/datarefs/count", nil, datarefsCountResp)
+	err := c.makeRequest(ctx, http.MethodGet, "/api/v2/datarefs/count", nil, datarefsCountResp)
 	if err != nil {
 		return 0, err
 	}
 	return datarefsCountResp.Data, nil
 }
 
-// GetDatarefByName returns the Dataref object with the specified name.  This only works if the
-// XPClient.LoadDatarefs method has already been called.
-func (xpc *XPClient) GetDatarefByName(ctx context.Context, name string) (*Dataref, error) {
-	xpc.datarefsLock.RLock()
-	defer xpc.datarefsLock.RUnlock()
+// GetDatarefByID returns the [Dataref] object with the specified ID.  If no such dataref is
+// cached, a value of nil will be returned.
+func (c *Client) GetDatarefByID(id uint64) (dref *Dataref) {
+	c.datarefsLock.RLock()
+	defer c.datarefsLock.RUnlock()
 
-	dataref, exists := xpc.datarefs[name]
-	if !exists {
-		return nil, fmt.Errorf("no dataref exists with name %s", name)
+	if dataref, exists := c.datarefsByID[id]; exists {
+		dref = dataref
 	}
-
-	return dataref, nil
+	return
 }
 
-// LoadDatarefs should be called after the client is instantiated, to populate a cache of dataref
-// ID mappings.  Attempting to lookup dataref values will fail if LoadDatarefs has not yet been
-// called.  It will not need to be called again unless the simulator is restarted.
-func (xpc *XPClient) LoadDatarefs(ctx context.Context) error {
+// GetDatarefByName returns the [Dataref] object with the specified name.  If no such dataref is
+// cached, a value of nil will be returned.
+func (c *Client) GetDatarefByName(name string) (dref *Dataref) {
+	c.datarefsLock.RLock()
+	defer c.datarefsLock.RUnlock()
+
+	if dataref, exists := c.datarefsByName[name]; exists {
+		dref = dataref
+	}
+	return
+}
+
+// GetDatarefID returns the ID of the [Dataref] with the specified name.  If no such dataref
+// is found, an value of zero is returned.
+func (c *Client) GetDatarefID(name string) (id uint64) {
+	if dref := c.GetDatarefByName(name); dref != nil {
+		id = dref.ID
+	}
+	return
+}
+
+// GetDatarefName returns the name of the [Dataref] with the specified ID.  If no such dataref
+// is found, an empty string value is returned.
+func (c *Client) GetDatarefName(id uint64) (name string) {
+	if dref := c.GetDatarefByID(id); dref != nil {
+		name = dref.Name
+	}
+	return
+}
+
+// loadDatarefs should be called after the client is instantiated, to populate a cache of dataref
+// ID and name mappings.
+func (xpc *Client) loadDatarefs(ctx context.Context) error {
 	xpc.datarefsLock.Lock()
 	defer xpc.datarefsLock.Unlock()
 
-	datarefs, err := xpc.GetDatarefs(ctx)
+	datarefs, err := xpc.REST.GetDatarefs(ctx)
 	if err != nil {
 		return err
 	}
 
-	xpc.datarefs = make(DatarefsMap)
+	xpc.datarefsByID = make(datarefsIDMap)
+	xpc.datarefsByName = make(datarefsNameMap)
+
 	for _, dataref := range datarefs {
-		xpc.datarefs[dataref.Name] = dataref
+		xpc.datarefsByID[dataref.ID] = dataref
+		xpc.datarefsByName[dataref.Name] = dataref
 	}
 
 	return nil
@@ -192,36 +222,36 @@ func (xpc *XPClient) LoadDatarefs(ctx context.Context) error {
 
 // GetDatarefValue returns a type-agnostic DatarefValue object containing the value of the dataref
 // with the specified name.
-func (xpc *XPClient) GetDatarefValue(ctx context.Context, name string) (*DatarefValue, error) {
-	dataref, err := xpc.GetDatarefByName(ctx, name)
-	if err != nil {
-		return nil, fmt.Errorf("getDatarefID(): %w", err)
+func (c *RESTClient) GetDatarefValue(ctx context.Context, name string) (*DatarefValue, error) {
+	dref := c.client.GetDatarefByName(name)
+	if dref == nil {
+		return nil, fmt.Errorf("no such dataref: %s", name)
 	}
 
-	path := fmt.Sprintf("/api/v2/datarefs/%d/value", dataref.ID)
+	path := fmt.Sprintf("/api/v2/datarefs/%d/value", dref.ID)
 	datarefValueResp := &datarefValueResponse{}
-	err = xpc.RestRequest(ctx, http.MethodGet, path, nil, datarefValueResp)
+	err := c.makeRequest(ctx, http.MethodGet, path, nil, datarefValueResp)
 	if err != nil {
 		return nil, err
 	}
 
 	return &DatarefValue{
-		ValueType: dataref.ValueType,
-		Value:     datarefValueResp.Data,
+		Dataref: dref,
+		Value:   datarefValueResp.Data,
 	}, nil
 }
 
 // SetDatarefValue applies the specified value to the specified dataref.
-func (xpc *XPClient) SetDatarefValue(ctx context.Context, name string, value any) error {
-	dataref, err := xpc.GetDatarefByName(ctx, name)
-	if err != nil {
-		return fmt.Errorf("getDatarefID(): %w", err)
+func (c *RESTClient) SetDatarefValue(ctx context.Context, name string, value any) error {
+	drefID := c.client.GetDatarefID(name)
+	if drefID == 0 {
+		return fmt.Errorf("no such dataref: %s", name)
 	}
 
-	path := fmt.Sprintf("/api/v2/datarefs/%d/value", dataref.ID)
+	path := fmt.Sprintf("/api/v2/datarefs/%d/value", drefID)
 	payload := genSetDatarefValuePayload(value)
 
-	err = xpc.RestRequest(ctx, http.MethodPatch, path, payload, nil)
+	err := c.makeRequest(ctx, http.MethodPatch, path, payload, nil)
 	if err != nil {
 		return err
 	}
@@ -231,21 +261,21 @@ func (xpc *XPClient) SetDatarefValue(ctx context.Context, name string, value any
 
 // SetDatarefElementValue applies the specified value to the specified element index of the
 // specified array type dataref.
-func (xpc *XPClient) SetDatarefElementValue(
+func (c *RESTClient) SetDatarefElementValue(
 	ctx context.Context,
 	name string,
 	index int,
 	value any,
 ) error {
-	dataref, err := xpc.GetDatarefByName(ctx, name)
-	if err != nil {
-		return fmt.Errorf("getDatarefID(): %w", err)
+	drefID := c.client.GetDatarefID(name)
+	if drefID == 0 {
+		return fmt.Errorf("no such dataref: %s", name)
 	}
 
-	path := fmt.Sprintf("/api/v2/datarefs/%d/value?index=%d", dataref.ID, index)
+	path := fmt.Sprintf("/api/v2/datarefs/%d/value?index=%d", drefID, index)
 	payload := genSetDatarefValuePayload(value)
 
-	err = xpc.RestRequest(ctx, http.MethodPatch, path, payload, nil)
+	err := c.makeRequest(ctx, http.MethodPatch, path, payload, nil)
 	if err != nil {
 		return err
 	}

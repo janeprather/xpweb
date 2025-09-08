@@ -22,7 +22,7 @@ type commandPost struct {
 type Command struct {
 	// The ID of the command.  This may change between simulator sessions, but will remain static
 	// within any given session, including across aircraft loads and unloads.
-	ID uint `json:"id"`
+	ID uint64 `json:"id"`
 	// The fully qualified name of the command, as used by the simulator and plugins.
 	Name string `json:"name"`
 	// The human readable description of what the command does.
@@ -30,9 +30,9 @@ type Command struct {
 }
 
 // GetCommands fetches and returns a list of available commands from the simulator.
-func (xpc *XPClient) GetCommands(ctx context.Context) ([]*Command, error) {
+func (c *RESTClient) GetCommands(ctx context.Context) ([]*Command, error) {
 	commandsResp := &commandsResponse{}
-	err := xpc.RestRequest(ctx, http.MethodGet, "/api/v2/commands", nil, commandsResp)
+	err := c.makeRequest(ctx, http.MethodGet, "/api/v2/commands", nil, commandsResp)
 	if err != nil {
 		return nil, err
 	}
@@ -40,44 +40,74 @@ func (xpc *XPClient) GetCommands(ctx context.Context) ([]*Command, error) {
 }
 
 // GetCommandsCount returns the number of total commands available.
-func (xpc *XPClient) GetCommandsCount(ctx context.Context) (int, error) {
+func (c *RESTClient) GetCommandsCount(ctx context.Context) (int, error) {
 	commandsCountResp := &commandsCountResponse{}
-	err := xpc.RestRequest(ctx, http.MethodGet, "/api/v2/commands/count", nil, commandsCountResp)
+	err := c.makeRequest(ctx, http.MethodGet, "/api/v2/commands/count", nil, commandsCountResp)
 	if err != nil {
 		return 0, err
 	}
 	return commandsCountResp.Data, nil
 }
 
-// GetCommandByName returns the Command object with the specified name.  This only works if the
-// XPClient.LoadCommands method has already been called.
-func (xpc *XPClient) GetCommandByName(ctx context.Context, name string) (*Command, error) {
-	xpc.commandsLock.RLock()
-	defer xpc.commandsLock.RUnlock()
+// GetCommandByID returns the [Command] object with the specified ID value.  If no such command
+// is cached, a value of nil will be returned.
+func (c *Client) GetCommandByID(id uint64) (cmd *Command) {
+	c.commandsLock.RLock()
+	defer c.commandsLock.RUnlock()
 
-	command, exists := xpc.commands[name]
-	if !exists {
-		return nil, fmt.Errorf("no command exists with name %s", name)
+	if command, exists := c.commandsByID[id]; exists {
+		cmd = command
 	}
-
-	return command, nil
+	return
 }
 
-// LoadCommands should be called after the client is instantiated, to populate a cache of command
-// ID mappings.  Attempting to activate commands will fail if LoadCommands has not yet been called.
-// It will not need to be called again unless the simulator is restarted.
-func (xpc *XPClient) LoadCommands(ctx context.Context) error {
-	xpc.commandsLock.Lock()
-	defer xpc.commandsLock.Unlock()
+// GetCommandByName returns the [Command] object with the specified name.  If no such command
+// is cached, a value of nil will be returned.
+func (c *Client) GetCommandByName(name string) (cmd *Command) {
+	c.commandsLock.RLock()
+	defer c.commandsLock.RUnlock()
 
-	commands, err := xpc.GetCommands(ctx)
+	if command, exists := c.commandsByName[name]; exists {
+		cmd = command
+	}
+	return
+}
+
+// GetCommandID returns the ID of the [Command] with the specified name.  If no such command
+// is found, a value of zero is returned.
+func (c *Client) GetCommandID(name string) (id uint64) {
+	if cmd := c.GetCommandByName(name); cmd != nil {
+		id = cmd.ID
+	}
+	return
+}
+
+// GetCommandName returns the name of the [Command] with the specified ID.  If no such command
+// is found, an empty string value is returned.
+func (c *Client) GetCommandName(id uint64) (name string) {
+	if cmd := c.GetCommandByID(id); cmd != nil {
+		name = cmd.Name
+	}
+	return
+}
+
+// loadCommands should be called after the client is instantiated, to populate a cache of command
+// ID mappings.
+func (c *Client) loadCommands(ctx context.Context) error {
+	c.commandsLock.Lock()
+	defer c.commandsLock.Unlock()
+
+	commands, err := c.REST.GetCommands(ctx)
 	if err != nil {
 		return err
 	}
 
-	xpc.commands = make(CommandsMap)
+	c.commandsByID = make(commandsIDMap)
+	c.commandsByName = make(commandsNameMap)
+
 	for _, command := range commands {
-		xpc.commands[command.Name] = command
+		c.commandsByID[command.ID] = command
+		c.commandsByName[command.Name] = command
 	}
 
 	return nil
@@ -85,16 +115,16 @@ func (xpc *XPClient) LoadCommands(ctx context.Context) error {
 
 // ActivateCommand runs a command for a fixed duration. A zero duration will cause the command to
 // be triggered on and off immediately but not be held down.  The maximum duration is 10 seconds.
-func (xpc *XPClient) ActivateCommand(ctx context.Context, name string, duration float64) error {
-	command, err := xpc.GetCommandByName(ctx, name)
-	if err != nil {
-		return fmt.Errorf("getDatarefID(): %w", err)
+func (c *RESTClient) ActivateCommand(ctx context.Context, name string, duration float64) error {
+	command := c.client.GetCommandByName(name)
+	if command == nil {
+		return fmt.Errorf("no such command: %s", name)
 	}
 
 	path := fmt.Sprintf("/api/v2/command/%d/activate", command.ID)
 	payload := &commandPost{Duration: duration}
 
-	err = xpc.RestRequest(ctx, http.MethodPost, path, payload, nil)
+	err := c.makeRequest(ctx, http.MethodPost, path, payload, nil)
 	if err != nil {
 		return err
 	}
